@@ -1,0 +1,53 @@
+{
+  "air_quality": {
+    "feature_size": 10,
+    "window_size": 24,
+    "t_len": 672,
+    "zl_size": 8,
+    "zg_size": 8,
+    "mc_samples": 15,
+    "glr_local_encoder_size": [32, 64, 64],
+    "glr_global_encoder_size": [32, 64, 64],
+    "glr_decoder_size": [64, 32],
+    "kernel_scales": 4,
+    "length_scale": 2,
+    "beta": 0.1,
+    "kernels": ["cauchy", "rbf"],
+    "feature_list": ["PM2.5", "PM10", "SO2", "NO2", "CO", "O3", "TEMP", "PRES", "DEWP", "WSPM"],
+    "baseline_encoder_size": [32, 64, 64, 32],
+    "baseline_decoder_size": [64, 64, 32]
+  },
+  "physionet": {
+    "feature_size": 10,
+    "window_size": 4,
+    "t_len": 60,
+    "zl_size": 8,
+    "zg_size": 8,
+    "mc_samples": 10,
+    "glr_local_encoder_size": [32, 64, 32],
+    "glr_global_encoder_size": [32, 64, 32],
+    "glr_decoder_size": [32, 64, 32],
+    "kernel_scales": 4,
+    "length_scale": 2,
+    "beta": 0.1,
+    "kernels": ["cauchy", "rbf"],
+    "feature_list": ["DiasABP", "GCS", "HCT", "MAP", "NIDiasABP", "NIMAP", "NISysABP", "RespRate", "SysABP", "Temp"],
+    "baseline_encoder_size": [32, 32, 64, 32],
+    "baseline_decoder_size": [32, 64, 32]
+  },
+  "simulation": {
+    "feature_size": 1,
+    "window_size": 10,
+    "t_len": 150,
+    "zl_size": 1,
+    "zg_size": 1,
+    "mc_samples": 5,
+    "glr_local_encoder_size": [2],
+    "glr_global_encoder_size": [2],
+    "glr_decoder_size": [4,2],
+    "kernel_scales": 1,
+    "length_scale": 1,
+    "beta": 0.1,
+    "kernels": ["rbf"]
+  }
+}
