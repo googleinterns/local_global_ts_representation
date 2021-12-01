@@ -18,7 +18,7 @@ import json
 import os
 import sys
 
-from gl_rep.data_loaders import airq_data_loader, simulation_loader, physionet_data_loader
+from gl_rep.data_loaders import airq_data_loader, simulation_loader, physionet_data_loader, har_data_loader
 from gl_rep.glr import GLR
 from gl_rep.models import EncoderGlobal, EncoderLocal, WindowDecoder
 from gl_rep.utils import plot_reps, train_glr
@@ -42,7 +42,7 @@ def main(args):
     with open('configs.json') as config_file:
         configs = json.load(config_file)[args.data]
     if args.data=='air_quality':
-        n_epochs = 200
+        n_epochs = 250
         lr = 1e-3
         trainset, validset, testset, _ = airq_data_loader(normalize="mean_zero")
     elif args.data=='simulation':
@@ -50,9 +50,13 @@ def main(args):
         lr = 1e-2
         trainset, validset, testset, _, _ = simulation_loader(normalize="none", mask_threshold=0.0)
     elif args.data == 'physionet':
-        n_epochs = 300
+        n_epochs = 200
         lr = 1e-3
         trainset, validset, testset, _ = physionet_data_loader(normalize="mean_zero")
+    elif args.data=='har':
+        n_epochs = 150
+        lr = 1e-3
+        trainset, validset, testset, normalization_specs = har_data_loader(normalize='none')
 
     # Create the representation learning models
     zt_encoder = EncoderLocal(zl_size=configs["zl_size"], hidden_sizes=configs["glr_local_encoder_size"])

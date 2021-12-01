@@ -49,5 +49,23 @@
     "length_scale": 1,
     "beta": 0.1,
     "kernels": ["rbf"]
+  },
+    "har": {
+    "feature_size": 561,
+    "window_size": 5,
+    "t_len": 180,
+    "zl_size": 16,
+    "zg_size": 2,
+    "mc_samples": 20,
+    "glr_local_encoder_size": [128, 64, 32],
+    "glr_global_encoder_size": [128, 32],
+    "glr_decoder_size": [64, 128],
+    "kernel_scales": 3,
+    "length_scale": 2,
+    "beta": 0.1,
+    "kernels": ["cauchy", "rbf"],
+    "feature_list": ["DiasABP", "GCS", "HCT", "MAP", "NIDiasABP", "NIMAP", "NISysABP", "RespRate", "SysABP", "Temp"],
+    "baseline_encoder_size": [128, 64, 32, 32],
+    "baseline_decoder_size": [64, 128]
   }
 }

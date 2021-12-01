@@ -22,10 +22,11 @@ import sys
 import seaborn as sns
 sns.set()
 import tensorflow as tf
+from tensorflow_probability import distributions as tfd
 
 from gl_rep.utils import train_vae, run_epoch
 from gl_rep.glr import GLR
-from gl_rep.data_loaders import airq_data_loader, simulation_loader, physionet_data_loader
+from gl_rep.data_loaders import airq_data_loader, simulation_loader, physionet_data_loader, har_data_loader
 
 currentdir = os.path.dirname(os.path.realpath(__file__))
 parentdir = os.path.dirname(currentdir)
@@ -125,6 +126,7 @@ class Encoder(tf.keras.Model):
         """Initializes the instance"""
         super(Encoder, self).__init__()
         self.zl_size = int(zl_size)
+        self.hidden_sizes = hidden_sizes
 
         self.lstm = tf.keras.layers.LSTM(units=hidden_sizes[0], activation=tf.nn.sigmoid)
         self.encoder_net = tf.keras.Sequential([tf.keras.layers.Dense(h, activation=tf.nn.relu, dtype=tf.float32)
@@ -215,6 +217,9 @@ def main(args):
     elif args.data=='physionet':
         n_epochs = 50
         trainset, validset, testset, normalization_specs = physionet_data_loader(normalize="mean_zero")
+    elif args.data=='har':
+        n_epochs = 150
+        trainset, validset, testset, normalization_specs = har_data_loader(normalize='none')
 
     # Create the representation learning models
     encoder = Encoder(zl_size=args.rep_size, hidden_sizes=configs["baseline_encoder_size"])
@@ -247,7 +252,7 @@ def main(args):
         x_std = p_xhat.stddev()
         rnd_ind = np.random.randint(len(x_seq))
 
-        f, axs = plt.subplots(nrows=min(10, feature_size), ncols=1, figsize=(16, min(10, feature_size) * 3))
+        f, axs = plt.subplots(nrows=min(10, configs["feature_size"]), ncols=1, figsize=(16, min(10, configs["feature_size"]) * 3))
         t_axis = np.arange(x_seq.shape[1])
         for i, ax in enumerate(axs):
             ax.plot(t_axis, x_mean[rnd_ind, :, i], '--', label='Reconstructed signal')

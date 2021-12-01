@@ -16,15 +16,16 @@ from absl import flags
 from absl import app
 import argparse
 import json
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import os
 import seaborn as sns
 sns.set();
 import tensorflow as tf
 
 from gl_rep.models import EncoderLocal, EncoderGlobal, WindowDecoder
 from gl_rep.glr import GLR
-from gl_rep.data_loaders import airq_data_loader, simulation_loader, physionet_data_loader
+from gl_rep.data_loaders import airq_data_loader, simulation_loader, physionet_data_loader, har_data_loader
 from baselines.gpvae import GPVAE, Decoder
 from baselines.vae import VAE, Encoder, Decoder
 
@@ -37,33 +38,47 @@ FLAGS = flags.FLAGS
 
 
 # Physionet config
-# flags.DEFINE_integer('window_size', 4, 'Window size for the local encoder')
-# flags.DEFINE_integer('rep_size', 8, 'Size of the latent representation vector')
-# flags.DEFINE_float('global_sample_len', 0.6, 'ratio of the signal to look at')
-# flags.DEFINE_float('lamda', 1.0, 'Regularization weight in GLR')
-# flags.DEFINE_float('lr', 1e-3, 'Learning rate')
-# flags.DEFINE_integer('repeat', 3, 'Number of random windows sampled from each data sample during the training')
-# flags.DEFINE_integer('n_epochs', 60, 'Number of training epochs')
-# flags.DEFINE_integer('n_classes', 4, 'Number of classification classes')
-# flags.DEFINE_string('mode', 'glr', 'Which encoder baseline to use')
-# flags.DEFINE_string('data', 'physionet', 'Which dataset to use')
-# flags.DEFINE_string('category', 'global', 'Which representations to use for the classification')
-# flags.DEFINE_string('experiment', 'classification', 'Which experiment setup to run')
+flags.DEFINE_integer('window_size', 4, 'Window size for the local encoder')
+flags.DEFINE_integer('rep_size', 8, 'Size of the latent representation vector')
+flags.DEFINE_float('global_sample_len', 0.6, 'ratio of the signal to look at')
+flags.DEFINE_float('lamda', 0.0, 'Regularization weight in GLR')
+flags.DEFINE_float('lr', 1e-3, 'Learning rate')
+flags.DEFINE_integer('repeat', 3, 'Number of random windows sampled from each data sample during the training')
+flags.DEFINE_integer('n_epochs', 60, 'Number of training epochs')
+flags.DEFINE_integer('n_classes', 4, 'Number of classification classes')
+flags.DEFINE_string('mode', 'glr', 'Which encoder baseline to use')
+flags.DEFINE_string('data', 'physionet', 'Which dataset to use')
+flags.DEFINE_string('category', 'global', 'Which representations to use for the classification')
+flags.DEFINE_string('experiment', 'classification', 'Which experiment setup to run')
 
 
 # air quality config
-flags.DEFINE_integer('window_size', 24, 'Window size for the local encoder')
-flags.DEFINE_integer('rep_size', 8, 'Size of the latent representation vector')
-flags.DEFINE_float('global_sample_len', 0.3, 'ratio of the signal to look at')
-flags.DEFINE_float('lamda', 1.0, 'Regularization weight in GLR')
-flags.DEFINE_float('lr', 1e-3, 'Learning rate')
-flags.DEFINE_integer('repeat', 5, 'Number of random windows sampled from each data sample during the training')
-flags.DEFINE_integer('n_epochs', 80, 'Number of training epochs')
-flags.DEFINE_integer('n_classes', 12, 'Number of classification classes')
-flags.DEFINE_string('mode', 'glr', 'Which encoder baseline to use')
-flags.DEFINE_string('data', 'air_quality', 'Which dataset to use')
-flags.DEFINE_string('category', 'global', 'Which representations to use for the classification')
-flags.DEFINE_string('experiment', 'classification', 'Which experiment setup to run')
+# flags.DEFINE_integer('window_size', 24, 'Window size for the local encoder')
+# flags.DEFINE_integer('rep_size', 8, 'Size of the latent representation vector')
+# flags.DEFINE_float('global_sample_len', 0.3, 'ratio of the signal to look at')
+# flags.DEFINE_float('lamda', 0.0, 'Regularization weight in GLR')
+# flags.DEFINE_float('lr', 1e-3, 'Learning rate')
+# flags.DEFINE_integer('repeat', 5, 'Number of random windows sampled from each data sample during the training')
+# flags.DEFINE_integer('n_epochs', 80, 'Number of training epochs')
+# flags.DEFINE_integer('n_classes', 12, 'Number of classification classes')
+# flags.DEFINE_string('mode', 'glr', 'Which encoder baseline to use')
+# flags.DEFINE_string('data', 'air_quality', 'Which dataset to use')
+# flags.DEFINE_string('category', 'global', 'Which representations to use for the classification')
+# flags.DEFINE_string('experiment', 'classification', 'Which experiment setup to run')
+
+# har data config
+# flags.DEFINE_integer('window_size', 5, 'Window size for the local encoder')
+# flags.DEFINE_integer('rep_size', 8, 'Size of the latent representation vector')
+# flags.DEFINE_float('global_sample_len', 0.3, 'ratio of the signal to look at')
+# flags.DEFINE_float('lamda', 0.5, 'Regularization weight in GLR')
+# flags.DEFINE_float('lr', 1e-3, 'Learning rate')
+# flags.DEFINE_integer('repeat', 5, 'Number of random windows sampled from each data sample during the training')
+# flags.DEFINE_integer('n_epochs', 200, 'Number of training epochs')
+# flags.DEFINE_integer('n_classes', 6, 'Number of classification classes')
+# flags.DEFINE_string('mode', 'e2e', 'Which encoder baseline to use')
+# flags.DEFINE_string('data', 'har', 'Which dataset to use')
+# flags.DEFINE_string('category', 'local', 'Which representations to use for the classification')
+# flags.DEFINE_string('experiment', 'classification', 'Which experiment setup to run')
 
 
 
@@ -77,6 +92,8 @@ def main(_argv):
             trainset, validset, testset, normalization_specs = airq_data_loader(normalize='mean_zero')
         elif FLAGS.data=='physionet':
             trainset, validset, testset, normalization_specs = physionet_data_loader(normalize='mean_zero')
+        elif FLAGS.data=='har':
+            trainset, validset, testset, normalization_specs = har_data_loader(normalize='none')
 
         # Create the representation learning models
         if FLAGS.mode=='gpvae':
@@ -123,7 +140,7 @@ def main(_argv):
                                                       n_classes=FLAGS.n_classes)
             elif FLAGS.category=='local':
                 representation_classifier = E2E_model(encoder_model=EncoderLocal(zl_size=FLAGS.rep_size,
-                                                                                 hidden_sizes=FLAGS.e2e_encoder_sizes),
+                                                                                 hidden_sizes=configs["baseline_encoder_size"]),
                                                       n_classes=FLAGS.n_classes)
 
         test_acc, test_loss = classification_exp(representation_classifier, FLAGS.mode=='e2e', configs["feature_size"],
@@ -143,8 +160,8 @@ def classification_exp(representation_classifier, e2e, feature_size, file_name, 
     print('************************* TRAINING %s CLASSIFIER *************************'%FLAGS.mode)
     train_classifier(trainset, validset, model=representation_classifier, n_epochs=FLAGS.n_epochs-20, lr=FLAGS.lr, ckpt_name=ckpt_name,
                      data=data, file_name=file_name, feature_size=feature_size, e2e=e2e)
-    test_loss, test_acc = run_classifier_epoch(e2e_classifier, testset, data=data, train=False, is_print=True, repeat=FLAGS.repeat)
-    print('Testset ==========> Accuracy = %.3f\n'%test_acc_e2e)
+    test_loss, test_acc = run_classifier_epoch(representation_classifier, testset, data=data, train=False, is_print=True, repeat=FLAGS.repeat)
+    print('Testset ==========> Accuracy = %.3f\n'%test_acc)
     return test_acc, test_loss
 
 
@@ -228,8 +245,8 @@ def train_classifier(trainset, validset, model, n_epochs, lr, ckpt_name,  file_n
     """Train a classifier to classify the subgroup of time series"""
     losses_train, losses_val, acc_train, acc_val = [], [], [], []
     optimizer = tf.keras.optimizers.Adam(lr)
-    model(x=tf.random.normal(shape=(1, 1000, feature_size), dtype=tf.float32), 
-          mask=tf.zeros(shape=(1, 1000, feature_size), dtype=tf.float32),
+    model(x=tf.random.normal(shape=(2, 1000, feature_size), dtype=tf.float32),
+          mask=tf.zeros(shape=(2, 1000, feature_size), dtype=tf.float32),
           window_size=FLAGS.window_size)
     if e2e:
         trainable_var = model.trainable_variables
@@ -289,7 +306,7 @@ def run_classifier_epoch(model, dataset, data, optimizer=None, train=False , tra
             elif FLAGS.category=='local':
                 rnd_t = np.random.randint(0, ((x_seq.shape[1] if x_lens is None else min(x_lens))//FLAGS.window_size)-1)
                 if data == 'har':
-                    all_labels = batch[3]- 1
+                    all_labels = batch[3]-1
                     labels = tf.math.argmax(tf.math.bincount(all_labels[:, rnd_t * FLAGS.window_size:(rnd_t + 1) * FLAGS.window_size], axis=-1), axis=-1)
                     labels_one_hot = tf.one_hot(labels, model.n_classes)
 

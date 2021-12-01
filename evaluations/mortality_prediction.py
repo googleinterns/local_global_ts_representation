@@ -139,6 +139,7 @@ def main(args):
 
     if not mode=='supervised':
         rep_model.load_weights(rep_model_file)
+    model.load_weights(file_name)
     test_loss, test_acc, test_auroc = run_epoch(model, testset, rep_model, train=False)
     print("\n Test performance \t loss = %.3f \t AUPRC = %.3f \t AUROC = %.3f" % (
                         test_loss, test_acc, test_auroc))

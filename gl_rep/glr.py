@@ -12,7 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import matplotlib.pyplot as plt
 import numpy as np
+import os
+import seaborn as sns
+sns.set()
 import tensorflow as tf
 from tensorflow_probability import distributions as tfd
 # Import all kernel functions
@@ -273,3 +277,110 @@ class GLR(tf.keras.Model):
         mi_upper_bound = tf.reduce_mean(mi_upper_bound, 0)
         mi = mi_upper_bound+nll
         return mi
+
+    def train(self, trainset, validset, data, lr=1e-4, n_epochs=2):
+        """Train the Global and Local representation learning (GLR) model
+        Args:
+            trainset: training dataset
+            validset: validation dataset
+            datae: Name of the dataset for training the model
+            lr: learning rate
+            n_epochs: Number of training epochs
+        """
+        _ = tf.compat.v1.train.get_or_create_global_step()
+        trainable_vars = self.get_trainable_vars()
+        optimizer = tf.keras.optimizers.Adam(lr)
+        if not os.path.exists('./ckpt'):
+            os.mkdir('./ckpt')
+        summary_writer = tf.summary.create_file_writer("./logs/training_summary")
+        with summary_writer.as_default():
+            losses_train, losses_val = [], []
+            kl_train, kl_val = [], []
+            kl_zg_train, kl_zg_val = [], []
+            nll_train, nll_val = [], []
+            reg_train, reg_val = [], []
+            for epoch in range(n_epochs + 1):
+                epoch_loss, epoch_nll, epoch_kl, epoch_cf_reg, epoch_kl_zg = self.run_epoch(trainset, train=True,
+                                                                                       optimizer=optimizer,
+                                                                                       trainable_vars=trainable_vars)
+                if epoch % 2 == 0:
+                    print('=' * 30)
+                    print('Epoch %d' % epoch, '(Learning rate: %.5f)' % (lr))
+                    losses_train.append(epoch_loss)
+                    kl_train.append(epoch_kl)
+                    kl_zg_train.append(epoch_kl_zg)
+                    nll_train.append(epoch_nll)
+                    reg_train.append(epoch_cf_reg)
+                    print("Training loss = %.3f \t NLL = %.3f \t KL(local) = %.3f \t CF_reg = %.3f \t KL(zg) = %.3f"
+                          % (epoch_loss, epoch_nll, epoch_kl, epoch_cf_reg, epoch_kl_zg))
+                    epoch_loss, epoch_nll, epoch_kl, epoch_cf_reg, epoch_kl_zg = self.run_epoch(validset)
+                    losses_val.append(epoch_loss)
+                    kl_val.append(epoch_kl)
+                    kl_zg_val.append(epoch_kl_zg)
+                    nll_val.append(epoch_nll)
+                    reg_val.append(epoch_cf_reg)
+                    print("Validation loss = %.3f \t NLL = %.3f \t KL(local) = %.3f \t CF_reg = %.3f \t KL(zg) = %.3f"
+                          % (epoch_loss, epoch_nll, epoch_kl, epoch_cf_reg, epoch_kl_zg))
+                    self.save_weights('./ckpt/glr_%s_lambda%.1f' % (data, self.lamda))
+
+            # Plot overall losses
+            if not os.path.exists('./plots'):
+                os.mkdir('./plots')
+            plt.figure()
+            plt.plot(losses_train, label='Train loss')
+            plt.plot(losses_val, label='Validation loss')
+            plt.legend()
+            plt.savefig('./plots/glr_loss_%s_lambda%.1f.pdf' % (data, self.lamda))
+
+            # Plot different components of the loss term
+            f, axs = plt.subplots(nrows=1, ncols=3, figsize=(18, 6))
+            f.suptitle("Different segments of the loss term")
+            for i, ax in enumerate(axs):
+                if i == 0:
+                    t_line = nll_train
+                    v_line = nll_val
+                    sub_title = "Negative Log Likelihood"
+                if i == 1:
+                    t_line = kl_train
+                    v_line = kl_val
+                    sub_title = "KL Divergence"
+                if i == 2:
+                    t_line = reg_train
+                    v_line = reg_val
+                    sub_title = "Counterfactual regularization"
+                ax.plot(t_line, label='Train')
+                ax.plot(v_line, label='Validation')
+                ax.set_title(sub_title)
+                ax.legend()
+            f.tight_layout()
+            plt.savefig('./plots/loss_components_%s_lambda%.1f.pdf' % (data, self.lamda))
+
+    def run_epoch(self, dataset, optimizer=None, train=False, trainable_vars=None):
+        """Training epoch for time series encoder and decoder models
+
+        Args:
+            dataset: Epoch dataset
+            optimizer: tf Optimizer
+            train: True if it is an epoch run for training, False is it is an inference run
+            trainable_vars: List of trainable variables of the model
+        """
+        epoch_loss, epoch_kl, epoch_kl_zg, epoch_nll, epoch_cf_loss = [], [], [], [], []
+        for i, batch in dataset.enumerate():
+            x_seq = batch[0]
+            mask_seq, x_lens = batch[1], batch[2]
+            global_sample_len = int(0.4 * x_seq.shape[1])
+            if train:
+                with tf.GradientTape() as gen_tape:
+                    gen_loss = self.compute_loss(x_seq, m_mask=mask_seq, x_len=x_lens,
+                                                  global_sample_len=global_sample_len)
+                gradients_of_generator = gen_tape.gradient(gen_loss, trainable_vars)
+                optimizer.apply_gradients(zip(gradients_of_generator, trainable_vars))
+            loss, nll, kl, cf_loss, kl_zg = self.compute_loss(x_seq, m_mask=mask_seq, x_len=x_lens,
+                                                               global_sample_len=global_sample_len,
+                                                               return_parts=True)
+            epoch_loss.append(loss.numpy())
+            epoch_nll.append(nll.numpy())
+            epoch_kl.append(kl.numpy())
+            epoch_kl_zg.append(kl_zg)
+            epoch_cf_loss.append(cf_loss)
+        return np.mean(epoch_loss), np.mean(epoch_nll), np.mean(epoch_kl), np.mean(epoch_cf_loss), np.mean(epoch_kl_zg)

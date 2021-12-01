@@ -126,11 +126,15 @@ def run_epoch(model, dataset, data_type, optimizer=None, train=False , trainable
             x_seq = batch[0]
             mask_seq, x_lens = batch[1], batch[2]
             global_sample_len = int(0.6*x_seq.shape[1]) # This is mainly because the missingness in Physionet data is a lot!
-        elif data_type == 'air_quality':
+        elif data_type == 'air_quality' or data_type == 'har':
             x_seq = batch[0]
             mask_seq, x_lens = batch[1], batch[2]
             global_sample_len = int(0.3 * x_seq.shape[1])
         elif data_type == 'simulation':
+            x_seq = batch[0]
+            mask_seq, x_lens = batch[1], batch[2]
+            global_sample_len = int(0.5 * x_seq.shape[1])
+        elif data_type == 'har':
             x_seq = batch[0]
             mask_seq, x_lens = batch[1], batch[2]
             global_sample_len = int(0.5 * x_seq.shape[1])
@@ -166,16 +170,7 @@ def plot_reps(dataset, gl_model, data):
     zg_all = []
     global_zs = []
     for i, batch in dataset.enumerate():
-        if data=='m5':
-            local_z = tf.gather(batch[0], indices=[3,7], axis=-1)
-            global_z = batch[1]
-            x_seq = tf.gather(batch[0], indices=[0,5,8], axis=-1)
-            mask_seq = None
-            x_lens = None
-            global_features = ['item_id', 'dept_id', 'cat_id', 'store_id', 'state_id']
-            local_features = ['Month', 'Year']
-            feature_list = m5_feature_list
-        elif data=='air_quality':
+        if data=='air_quality':
             x_seq = batch[0]
             mask_seq, x_lens = batch[1], batch[2]
             local_z, global_z = batch[3], batch[4]

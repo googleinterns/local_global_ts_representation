@@ -21,11 +21,14 @@ import sys
 import seaborn as sns
 sns.set()
 import tensorflow as tf
+from tensorflow_probability import distributions as tfd
+# Import all kernel functions
+from gl_rep.gp_kernel import *
 
 from gl_rep.models import EncoderLocal
 from gl_rep.utils import train_vae, run_epoch
 from gl_rep.glr import GLR
-from gl_rep.data_loaders import airq_data_loader, simulation_loader, physionet_data_loader
+from gl_rep.data_loaders import airq_data_loader, simulation_loader, physionet_data_loader, har_data_loader
 
 
 
@@ -289,6 +292,9 @@ def main(args):
     elif args.data == 'physionet':
         n_epochs = 50
         trainset, validset, testset, normalization_specs = physionet_data_loader(normalize="mean_zero")
+    elif args.data == 'har':
+        n_epochs = 150
+        trainset, validset, testset, normalization_specs = har_data_loader(normalize="mean_zero")
 
     # Create the representation learning models
     encoder = EncoderLocal(zl_size=args.rep_size, hidden_sizes=configs["baseline_encoder_size"])
@@ -319,14 +325,14 @@ def main(args):
         x_mean = p_xhat.mean()
         x_std = p_xhat.stddev()
         rnd_ind = np.random.randint(len(x_seq))
-        f, axs = plt.subplots(nrows=min(10, feature_size), ncols=1, figsize=(16, min(10, feature_size) * 3))
+        f, axs = plt.subplots(nrows=min(10, configs["feature_size"]), ncols=1, figsize=(16, min(10, configs["feature_size"]) * 3))
         t_axis = np.arange(x_seq.shape[1])
         for i, ax in enumerate(axs):
             ax.plot(t_axis, x_mean[rnd_ind, :, i], '--', label='Reconstructed signal')
             ax.fill_between(t_axis, (x_mean[rnd_ind, :, i] - x_std[rnd_ind, :, i]),
                             (x_mean[rnd_ind, :, i] + x_std[rnd_ind, :, i]), color='b', alpha=.2)
             ax.plot(t_axis, x_seq[rnd_ind, :, i], label='Original signal')
-            ax.set_ylabel('%s' % (feature_list[i]))
+            ax.set_ylabel('%s' % (configs["feature_list"][i]))
             ax.legend(bbox_to_anchor=(1, 1), loc='upper left')
         plt.tight_layout()
         plt.savefig("./plots/%s_signal_reconstruction.pdf" %(file_name))

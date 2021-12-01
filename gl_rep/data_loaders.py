@@ -206,7 +206,7 @@ def har_data_loader(normalize="none"):
                                                                                         normalize)
     # This is a small dataset, therefore the test and validation are the same. The validation set will not be used for hyperparameter search
     trainset = tf.data.Dataset.from_tensor_slices((signals[train_inds], maps[train_inds], lens_train,
-                                                   locals[train_inds], global_train)).batch(5)
+                                                   locals[train_inds], global_train)).batch(10)
     validset = tf.data.Dataset.from_tensor_slices((signals[test_inds], maps[test_inds], lens_test,
                                                    locals[test_inds], global_test)).batch(5)
     testset = tf.data.Dataset.from_tensor_slices((signals[test_inds], maps[test_inds], lens_test,

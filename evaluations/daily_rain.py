@@ -45,7 +45,7 @@ gpus = tf.config.list_physical_devices('GPU')
 for gpu in gpus:
     tf.config.experimental.set_memory_growth(gpu, True)
 
-mode = 'supervised'
+mode = 'glr'
 
 window_size = 1 * 24
 
@@ -53,17 +53,23 @@ window_size = 1 * 24
 def main(args):
     with open('configs.json') as config_file:
         configs = json.load(config_file)['air_quality']
-    n_epochs = 100
     if args.train:
         test_loss  = []
         for cv in range(3):
-            trainset, validset, testset, normalization_specs = airq_data_loader(normalize='mean_zero')
             model = Predictor([32, 8])
+            trainset, validset, testset, normalization_specs = airq_data_loader(normalize='mean_zero')
+            label_blocks_train = block_labels(trainset)
+            label_blocks_valid = block_labels(validset)
+            label_blocks_test = block_labels(testset)
             if mode=='supervised':
+                n_epochs = 200
+                lr = 1e-3
                 file_name = './ckpt/e2e_rain_prediction'
                 rep_model_file = 'End to end'
                 rep_model = None
             else:
+                n_epochs = 50
+                lr = 1e-4
                 if mode=='glr':
                     file_name = './ckpt/glr_rain_predictor'
                     rep_model_file = './ckpt/glr_air_quality_lambda%.1f'%args.lamda
@@ -100,7 +106,6 @@ def main(args):
                 rep_model.load_weights(rep_model_file)
 
             print('Trainig ', rep_model_file )
-            lr = 1e-4
             if mode=='glr':
                 model(tf.random.normal(shape=(5, 10, zt_encoder.zl_size), dtype=tf.float32),
                       tf.random.normal(shape=(5, zt_encoder.zl_size), dtype=tf.float32),
@@ -118,18 +123,18 @@ def main(args):
             losses_train, acc_train, auroc_train = [], [], []
             losses_val, acc_val, auroc_val = [], [], []
             for epoch in range(n_epochs+1):
-                epoch_loss = run_epoch(model, trainset, rep_model, optimizer=optimizer,
+                epoch_loss = run_epoch(model, trainset, rep_model, optimizer=optimizer, label_blocks = label_blocks_train,
                                                                train=True, trainable_vars=trainable_vars)
                 if epoch % 10 == 0:
                     print('=' * 30)
                     print('Epoch %d' % epoch, '(Learning rate: %.5f)' % (lr))
                     losses_train.append(epoch_loss)
                     print("Training loss = %.3f" % (epoch_loss))
-                    epoch_loss = run_epoch(model, validset, rep_model, train=False)
+                    epoch_loss = run_epoch(model, validset, rep_model, label_blocks = label_blocks_valid, train=False)
                     losses_val.append(epoch_loss)
                     print("Validation loss = %.3f" % (epoch_loss))
-                    print('Test loss =  %.3f'%run_epoch(model, testset, rep_model, train=False))
-            test_loss.append(run_epoch(model, testset, rep_model, train=False))
+                    print('Test loss =  %.3f'%run_epoch(model, testset, rep_model, label_blocks = label_blocks_test, train=False))
+            test_loss.append(run_epoch(model, testset, rep_model, label_blocks = label_blocks_test, train=False))
         print("\n\n Final performance \t loss = %.3f +- %.3f" % (np.mean(test_loss), np.std(test_loss)))
         plt.figure()
         plt.plot(losses_train, label='Train loss')
@@ -144,10 +149,9 @@ def main(args):
             file_name = './ckpt/e2e_rain_prediction'
             rep_model = None
         else:
-            model = Predictor([32, 8])
             if mode == 'glr':
                 file_name = './ckpt/glr_rain_predictor'
-                rep_model_file = './ckpt/glr_model_air_quality'
+                rep_model_file = './ckpt/glr_air_quality_lambda%.1f' %(args.lamda)
                 zt_encoder = EncoderLocal(zl_size=configs["zl_size"],
                                           hidden_sizes=configs["glr_local_encoder_size"])
                 zg_encoder = EncoderGlobal(zg_size=configs["zg_size"],
@@ -180,8 +184,9 @@ def main(args):
                                 M=configs["mc_samples"], sample_len=configs["t_len"])
             rep_model.load_weights(rep_model_file)
 
+        model = Predictor([32, 8])
         if not mode=='supervised':
-            rep_model.load_weights(rep_model_file).expect_partial()
+            rep_model.load_weights(rep_model_file)#.expect_partial()
         model.load_weights(file_name).expect_partial()
 
         # Plot the estimated daily rain for a random sample
@@ -195,7 +200,7 @@ def main(args):
                 global_sample_len = int(x_seq.shape[1] * 0.3)
                 rnd_t_g = np.random.randint(0, x_seq.shape[1] - global_sample_len)
                 z_g = rep_model.global_encoder(x_seq[:, rnd_t_g:rnd_t_g + global_sample_len, :],
-                                          mask=mask_seq[:, rnd_t_g:rnd_t_g + global_sample_len, :])
+                                          mask=mask_seq[:, rnd_t_g:rnd_t_g + global_sample_len, :]).sample()
                 pz_t = rep_model.local_encoder(x_seq,mask=mask_seq, window_size=window_size)
                 z_t = tf.transpose(pz_t.sample(), perm=(0, 2, 1))
                 pred = model(z_t, z_g, x_lens)[rnd_sample]
@@ -220,7 +225,7 @@ def main(args):
             plt.plot(labels, label='Average Daily Rain')
             plt.plot(pred, label='Estimated Daily Rain')
             plt.legend()
-            plt.savefig('./plots/evaluations/estimated_rain.pdf')
+            plt.savefig('./plots/evaluations/estimated_rain_%s.pdf'%mode)
             break
 
 
@@ -245,14 +250,21 @@ class Predictor(tf.keras.Model):
             h = local_encs
         logits = (self.fc(h))
         probs = tf.keras.layers.Dropout(rate=0.3)(self.prob(logits))
-        return probs
+        return probs[...,0]
 
 
-def run_epoch(model, dataset, glr_model, optimizer=None, train=False , trainable_vars=None):
+def run_epoch(model, dataset, glr_model, optimizer=None, label_blocks=None, train=False , trainable_vars=None):
     "Training epoch for training the classifier"
     mse_loss = tf.keras.losses.MeanSquaredError(reduction=tf.keras.losses.Reduction.NONE)
     mae_loss = tf.keras.losses.MeanAbsoluteError(reduction=tf.keras.losses.Reduction.NONE)
     epoch_loss, epoch_acc, epoch_auroc = [], [], []
+
+    if label_blocks is None:
+        all_labels_blocks = tf.concat([b[3][:, :, 1] for b in dataset], 0)
+        all_labels_blocks = tf.split(all_labels_blocks, num_or_size_splits=all_labels_blocks.shape[1] // window_size, axis=1)
+        label_blocks = tf.stack([tf.math.reduce_sum(block, axis=1) for block in all_labels_blocks], axis=-1)
+
+    b_start = 0
     for batch_i, batch in dataset.enumerate():
         x_seq = batch[0]
         mask_seq, x_lens = batch[1], batch[2]
@@ -261,8 +273,8 @@ def run_epoch(model, dataset, glr_model, optimizer=None, train=False , trainable
         if mode=='supervised':
             labels = all_labels
         else:
-            all_labels_blocks = tf.split(all_labels, num_or_size_splits=all_labels.shape[1]//window_size, axis=1)
-            labels = tf.stack([tf.math.reduce_sum(block, axis=1) for block in all_labels_blocks], axis=-1)
+            labels = label_blocks[b_start:b_start+len(x_seq)]
+            b_start += len(x_seq)
         labels = tf.where(tf.math.is_nan(labels), tf.zeros_like(labels), labels)
         if mode=='glr':
             global_sample_len = int(x_seq.shape[1] * 0.3)
@@ -288,16 +300,21 @@ def run_epoch(model, dataset, glr_model, optimizer=None, train=False , trainable
         if train:
             with tf.GradientTape() as gen_tape:
                 predictions = model(z_t, z_g, lens)
-                loss = mae_loss(labels, predictions)
-                loss_weight = tf.cast(tf.where(labels==0, 1.0, 10.), dtype=tf.float32)
-                loss = tf.reduce_mean(loss, axis=-1)*loss_weight
+                loss = tf.abs(tf.subtract(tf.cast(labels, dtype=tf.float32),tf.cast(predictions, dtype=tf.float32)))
+                loss_weight = tf.cast(tf.where(labels==0, 1.0, 1.), dtype=tf.float32)
+                loss = tf.reduce_mean(loss*loss_weight)
             grads = gen_tape.gradient(loss, trainable_vars)
             optimizer.apply_gradients(zip(grads, trainable_vars))
         else:
             predictions = model(z_t, z_g, lens)
-        epoch_loss.append(mse_loss(labels, predictions).numpy().mean())
+        epoch_loss.append(mae_loss(labels, predictions).numpy().mean())
     return np.mean(epoch_loss)
 
+def block_labels(dataset):
+    all_labels_blocks = tf.concat([b[3][:, :, 1] for b in dataset], 0)
+    all_labels_blocks = tf.split(all_labels_blocks, num_or_size_splits=all_labels_blocks.shape[1] // window_size, axis=1)
+    all_labels_blocks = tf.stack([tf.math.reduce_sum(block, axis=1) for block in all_labels_blocks], axis=-1)
+    return all_labels_blocks
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
