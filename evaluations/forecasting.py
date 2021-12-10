@@ -20,6 +20,7 @@ import argparse
 import json
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 import seaborn as sns
 sns.set();
 import tensorflow as tf
@@ -150,7 +151,7 @@ if __name__=="__main__":
     parser.add_argument('--data', type=str, default='air_quality', help="dataset to use")
     parser.add_argument('--train', action='store_true')
     parser.add_argument('--lamda', type=float, default=1., help="regularization weight")
-    parser.add_argument('--cv', type=int, default=5, help="number of cross validation")
+    parser.add_argument('--cv', type=int, default=20, help="number of cross validation")
     parser.add_argument('--rep_size', type=int, default=8, help="Size of the representation vectors")
     args = parser.parse_args()
     if not os.path.exists('./plots/evaluations'):
