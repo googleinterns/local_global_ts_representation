@@ -70,22 +70,6 @@ def main(args):
                         kernel=configs["kernels"], beta=configs["beta"], M=configs["mc_samples"], sigma=.5,
                         lamda=args.lamda, length_scale=configs["length_scale"], p=15)
 
-    # elif args.data == 'physionet':
-    #     trainset, validset, testset, normalization_specs = physionet_data_loader(normalize='mean_zero')
-    #     if mode=='gpvae':
-    #         file_name = 'gpvae%d_%s'%(args.rep_size, args.data)
-    #         encoder = EncoderLocal(zl_size=args.rep_size, hidden_sizes=[32, 32, 64, 64])
-    #         decoder = Decoder(output_size=feature_size, output_length=window_size, hidden_sizes=[32, 64, 32])
-    #         rep_model = GPVAE(encoder, decoder, time_length=t_len, data_dim=feature_size, window_size=window_size,
-    #                           kernel=['cauchy'], beta=0.1, M=1, sigma=1.0, length_scale=1.0, kernel_scales=2, p=100)
-    #     elif mode=='glr':
-    #         file_name = 'glr_%s_lambda%.1f' %(args.data, args.lamda)
-    #         zt_encoder = EncoderLocal(zl_size=8, hidden_sizes=[32, 64, 32])
-    #         zg_encoder = EncoderGlobal(zg_size=8, hidden_sizes=[32, 64, 32])
-    #         dec = WindowDecoder(output_size=feature_size, output_length=window_size, hidden_sizes=[32, 64, 32])
-    #         rep_model = GLR(global_encoder=zg_encoder, local_encoder=zt_encoder, decoder=dec,
-    #                         window_size=window_size, time_length=t_len, data_dim=feature_size, kernel_scales=4,
-    #                         kernel=['cauchy', 'rbf'], beta=0.1, M=10, sigma=.5, lamda=args.lamda, length_scale=2., p=15)
     rep_model.load_weights('./ckpt/%s' % file_name)
 
     # Evaluate the forecasting performance on the test set
