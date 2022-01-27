@@ -224,7 +224,7 @@ def airq_data_loader(normalize="none"):
         Args:
             normalize: The type of data normalizatino to perform ["none", "mean_zero", "min_max"]
         """
-    all_files = glob.glob("/home/sanatonekaboni/gl_data/air_quality/*.csv")
+    all_files = glob.glob("./data/air_quality/*.csv")
     column_list = ["year",	"month", "day",	"hour",	"PM2.5", "PM10", "SO2", "NO2", "CO", "O3", "TEMP", "PRES", "DEWP", "RAIN", "WSPM", "station"]
     feature_list = ["PM2.5", "PM10", "SO2", "NO2", "CO", "O3", "TEMP", "PRES", "DEWP", "WSPM"]
     sample_len = 24 *28 *1  # 2 months worth of data
@@ -335,12 +335,12 @@ def physionet_data_loader(normalize='none', dataset = 'set-a'):
                    }
     feature_list = list(feature_map.keys())
     local_list = ['MechVent', 'Weight']
-    data_dir = '/home/sanatonekaboni/gl_data/physionet'
+    data_dir = './data/physionet'
     static_vars = ['RecordID', 'Age', 'Gender', 'Height', 'ICUType', 'Weight']
     
-    if os.path.exists(('/home/sanatonekaboni/gl_data/physionet/processed_df.csv')):
-        df_full = pd.read_csv('/home/sanatonekaboni/gl_data/physionet/processed_df.csv')
-        df_static = pd.read_csv('/home/sanatonekaboni/gl_data/physionet/processed_static_df.csv')
+    if os.path.exists(('./data/physionet/processed_df.csv')):
+        df_full = pd.read_csv('./data/physionet/processed_df.csv')
+        df_static = pd.read_csv('./data/physionet/processed_static_df.csv')
     else:
         txt_all = list()
         for f in os.listdir(os.path.join(data_dir, dataset)):
@@ -483,8 +483,8 @@ def physionet_data_loader(normalize='none', dataset = 'set-a'):
             signal_df_binned['recordid'] = id
             signal_df_binned[col_list] = signal_df.groupby(bins).agg(dict(zip(col_list, ["mean"]*len(col_list)))).to_numpy()#{"Temperature": "mean"})
             df_full = pd.concat([signal_df_binned, df_full])
-        df_full.to_csv('/home/sanatonekaboni/gl_data/physionet/processed_df.csv')
-        df_static.to_csv('/home/sanatonekaboni/gl_data/physionet/processed_static_df.csv')
+        df_full.to_csv('./data/physionet/processed_df.csv')
+        df_static.to_csv('./data/physionet/processed_static_df.csv')
 
 
     selected_features = ['DiasABP', 'GCS', 'HCT', 'MAP', 'NIDiasABP', 'NIMAP', 'NISysABP', 'RespRate', 'SysABP', 'Temp']
