@@ -7,7 +7,7 @@
 
 
 ### Training the GLR model
-You can use the main script to train the local and global representation learning model for the datasets presented in the paper. This script will train all the model components, and plot the distribution of the local and global representation for the population.
+You can use the main script to train the local and global representation learning model for the datasets presented in the paper. This script will train all the model components, and plot the distribution of the local and global representation for the population. 
 ```
 python -m main --data [DATASET_NAME] --lamda [REGULARIZATION_WEIGHT] --train
 ```
@@ -18,7 +18,7 @@ python -m main --data [DATASET_NAME] --lamda [REGULARIZATION_WEIGHT] --train
 ```
 glr_model = GLR(global_encoder, local_encoder, decoder, time_length, data_dim, window_size, kernel, beta, lamda)
 ```
-3. Create your dataset objects (Make sure it includes the sample, mask, and the sample length)
+3. Create your own data loader function and dataset object (Make sure it includes the sample, mask, and the sample length)
 4. Train the model!
 ```
 glr_model.train(trainset, validset, [NAME OF DATASET], lr, n_epochs)
