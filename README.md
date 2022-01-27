@@ -6,13 +6,6 @@
 ![overview](https://user-images.githubusercontent.com/93283484/140096231-4a1c18c3-8a12-450d-b74a-1abcce2528fe.jpg)
 
 
-### Cloning the Conda environment
-Use the env-file.txt to recreate the conda environment with all the libraries required for the experiments. 
-```
-conda create --name tf-gpu --file env-file.txt
-```
-
-
 ### Training the GLR model
 You can use the main script to train the local and global representation learning model for the datasets presented in the paper. This script will train all the model components, and plot the distribution of the local and global representation for the population.
 ```
